@@ -15,13 +15,16 @@ let TOPS_BACK = [];
 let TOPS_MID = [];
 let TOPS_FRONT = [];
 
-// === Steve（代码绘制版） ===
+// Steve
 let steve = { x:0, y:0, w:0, h:0, dir:1, speed:1.4, bob:0 };
+
+// Oaks
+let oaks = [];
 
 function snap(v){ return Math.round(v/PIX)*PIX; }
 function block(x,y,w=PIX,h=PIX){ rect(snap(x),snap(y),snap(w),snap(h)); }
 
-// 山体（固定轮廓）
+// 固定山体
 function bump(t,c,w){ let x=(t-c)/(w/2); if(Math.abs(x)>1) return 0; let s=Math.cos(x*Math.PI*0.5); return s*s; }
 function fixedRidgeHeights(cols, baseY, amp, profile){
   let tops=new Array(cols);
@@ -51,16 +54,24 @@ function initScene(){
   TOPS_FRONT = fixedRidgeHeights(cols, BASE_Y,            height*0.20, 2);
   for(let i=0;i<cols;i++){ TOPS_MID[i]=max(TOPS_MID[i],TOPS_BACK[i]+PIX); TOPS_FRONT[i]=max(TOPS_FRONT[i],TOPS_MID[i]+PIX); }
 
-  // 史蒂夫尺寸/初始位置（像素网格上）
-  const GW=12, GH=18;                // 角色网格尺寸
+  // Steve 尺寸与位置
+  const GW=12, GH=18;
   steve.w = GW*PIX; steve.h = GH*PIX;
   steve.x = width*0.15;
   steve.y = BASE_Y - steve.h;
 
+  // 生成 5~7 棵橡木（大小 1 或 2）
+  let n = int(random(5,8));
+  for(let i=0;i<n;i++){
+    oaks.push({
+      x: snap(random(width*0.08,width*0.92)),
+      s: random()<0.5 ? 1 : 2
+    });
+  }
+
   inited=true;
 }
 
-// —— 天空 / 太阳 / 云 —— //
 function drawCloud(cx,cy,s){
   noStroke(); fill(255);
   const r=s*0.5;
@@ -93,7 +104,6 @@ function drawSun(vocal){
   }
 }
 
-// —— 山、草地、花 —— //
 function drawLayer(tops, baseY, col){
   noStroke(); fill(col[0],col[1],col[2]);
   for(let i=0;i<tops.length;i++){
@@ -113,6 +123,7 @@ function drawMountains(){
   drawLayer(TOPS_MID,   BASE_Y, [80,160,100]); drawSnow(TOPS_MID,   snap(height*0.68), 100);
   drawLayer(TOPS_FRONT, BASE_Y, [70,175,95]);
 }
+
 function drawMeadow(){
   for(let y=BASE_Y; y<height; y+=PIX){
     const k=map(y,BASE_Y,height,0,1);
@@ -120,6 +131,50 @@ function drawMeadow(){
     rect(0,y,width,PIX);
   }
 }
+
+// —— 橡木（像素风） ——
+// s=1 或 2。树干 2*s × 5*s；树冠由 4 行方块构成（上窄下宽），MC 感更强。
+function drawOakTree(xCenter, s){
+  const trunkC = [124,92,62];
+  const leafC  = [76,140,72];
+  const leafD  = [56,110,54];
+
+  const tw = 2*s, th = 5*s;
+  const yTop = BASE_Y - th*PIX;
+
+  // trunk
+  fill(trunkC[0],trunkC[1],trunkC[2]);
+  for(let yy=0; yy<th; yy++){
+    for(let xx=0; xx<tw; xx++){
+      block(xCenter + (xx - tw/2)*PIX, yTop + yy*PIX);
+    }
+  }
+
+  // canopy rows (top -> bottom)
+  const rows = [
+    4*s,   // row 0
+    6*s,   // row 1
+    8*s,   // row 2
+    6*s    // row 3
+  ];
+  // draw leaves
+  let yLeafTop = yTop - rows.length*PIX;
+  for(let r=0; r<rows.length; r++){
+    let w = rows[r];
+    let x0 = xCenter - (w/2)*PIX;
+    fill(leafC[0],leafC[1],leafC[2]);
+    for(let i=0;i<w;i++) block(x0 + i*PIX, yLeafTop + r*PIX);
+  }
+  // darker bottom edge for depth
+  let wB = rows[rows.length-1], xB = xCenter - (wB/2)*PIX;
+  fill(leafD[0],leafD[1],leafD[2]);
+  for(let i=0;i<wB;i+=2) block(xB + i*PIX, yLeafTop + (rows.length-1)*PIX);
+}
+function drawOaks(){
+  for(let o of oaks){ drawOakTree(o.x, o.s); }
+}
+
+// —— 花朵 & Steve —— 
 function drawFlowers(vocal){
   const bob=sin(frameCount*0.05)*map(vocal,0,50,0,2,true);
   for(let f of flowersSmall){
@@ -135,62 +190,42 @@ function drawFlowers(vocal){
     fill(255,220,90); block(x-PIX*0.6, y-PIX-12);
   }
 }
-
-// ===== 史蒂夫（代码像素版） =====
 function drawSteveBody(x0, y0, dir){
-  // 基本色
   const skin=[223,171,135], skinBack=[200,152,120];
   const hair=[60,40,25];
   const shirt=[46,175,170], shirtShadow=[36,150,140];
   const pants=[55,85,170], pantsBack=[42,70,150];
   const shoe=[130,130,130], white=[255,255,255], eye=[70,50,35];
-
-  const s = PIX;
-  const GW = 12, GH = 18; // 角色网格宽高
-  function put(col, px,py,w=1,h=1){
-    fill(col[0],col[1],col[2]);
-    for(let yy=0; yy<h; yy++) for(let xx=0; xx<w; xx++){
-      let gx = px+xx, gy = py+yy;
-      if(dir<0) gx = (GW-1) - gx; // 镜像
-      block(x0 + gx*s, y0 + gy*s, s, s);
+  const s=PIX, GW=12, GH=18;
+  function put(c,px,py,w=1,h=1){
+    fill(c[0],c[1],c[2]);
+    for(let yy=0;yy<h;yy++) for(let xx=0;xx<w;xx++){
+      let gx=px+xx, gy=py+yy; if(dir<0) gx=(GW-1)-gx; block(x0+gx*s,y0+gy*s,s,s);
     }
   }
-
-  // 鞋
-  put(shoe, 2,17, 3,1); put(shoe, 7,17, 3,1);
-  // 裤（前/后腿）
-  put(pantsBack, 2,12, 3,5); put(pants, 7,12, 3,5);
-  // 身体
-  put(shirtShadow, 3,8, 2,4); put(shirt, 5,8, 4,4);
-  // 手臂（后/前）
-  put(shirtShadow, 2,8, 1,2); put(skinBack, 2,10, 1,3);
-  put(shirt, 9,8, 1,2);       put(skin,     9,10, 1,3);
-  // 头发 + 脸（侧面）
-  put(hair, 3,2, 6,2);           // 顶部
-  put(hair, 3,4, 2,3);           // 后脑
-  put(skin, 5,4, 4,3);           // 脸
-  put(white, 7,5, 1,1); put(eye, 7,5, 1,1); // 眼睛（简化）
-  // 下巴（一点胡渣色）
-  put([190,140,110], 5,7, 3,1);
+  put(shoe,2,17,3,1); put(shoe,7,17,3,1);
+  put(pantsBack,2,12,3,5); put(pants,7,12,3,5);
+  put(shirtShadow,3,8,2,4); put(shirt,5,8,4,4);
+  put(shirtShadow,2,8,1,2); put(skinBack,2,10,1,3);
+  put(shirt,9,8,1,2);       put(skin,9,10,1,3);
+  put(hair,3,2,6,2); put(hair,3,4,2,3);
+  put(skin,5,4,4,3);
+  put(white,7,5,1,1); put(eye,7,5,1,1);
+  put([190,140,110],5,7,3,1);
 }
-
 function updateAndDrawSteve(drum){
-  // 速度受鼓的能量微调（也可设为常量）
-  let sp = steve.speed + map(drum,0,50,0,1.0,true);
-  steve.x += steve.dir * sp;
-
-  let left = PIX*2, right = width - steve.w - PIX*2;
-  if(steve.x > right){ steve.x = right; steve.dir = -1; }
-  if(steve.x < left ){ steve.x = left;  steve.dir =  1; }
-
-  steve.bob = sin(frameCount*0.15)*PIX*0.4;
-  steve.y   = BASE_Y - steve.h + steve.bob;
-
+  let sp=steve.speed + map(drum,0,50,0,1.0,true);
+  steve.x += steve.dir*sp;
+  let L=PIX*2, R=width-steve.w-PIX*2;
+  if(steve.x>R){steve.x=R;steve.dir=-1;}
+  if(steve.x<L){steve.x=L;steve.dir=1;}
+  steve.bob=sin(frameCount*0.15)*PIX*0.4;
+  steve.y=BASE_Y-steve.h+steve.bob;
   noStroke();
-  drawSteveBody(steve.x, steve.y, steve.dir);
+  drawSteveBody(steve.x,steve.y,steve.dir);
 }
 
-// —— 歌词 —— //
+// —— 歌词 —— 
 function drawLyrics(words){
   const ts=min(64,width*0.06);
   textSize(ts); textAlign(CENTER,CENTER); textStyle(BOLD);
@@ -203,18 +238,17 @@ function drawLyrics(words){
   text(words,width/2,height*0.14);
 }
 
-// —— 主帧 —— //
+// —— 主帧 —— 
 function draw_one_frame(words, vocal, drum, bass, other, counter){
   if(!inited) initScene();
-
   drawSky(other);
   drawSun(vocal);
   drawMountains();
   drawMeadow();
 
-  // 史蒂夫（在草地上行走）
+  // 先画树，再画史蒂夫和花（这样人物和花在树前面）
+  drawOaks();
   updateAndDrawSteve(drum);
-
   drawFlowers(vocal);
 
   if(!words || words===""){ last_words_opacity*=0.95; words=last_words; }
