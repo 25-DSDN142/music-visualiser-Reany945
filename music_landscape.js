@@ -118,13 +118,16 @@ function drawSnow(tops, baseY, level){
 }
 
 function drawMountains(){
-  drawLayer(TOPS_BACK,  snap(height*0.58), [92,150,112]);
+  // 后山：填充到底（BASE_Y），但积雪阈值按原来的 0.58 高度
+  drawLayer(TOPS_BACK,  BASE_Y, [92,150,112]);
   drawSnow (TOPS_BACK,  snap(height*0.58), 120);
 
-  drawLayer(TOPS_MID,   snap(height*0.68), [80,160,100]);
+  // 中山：同样贴合草坪
+  drawLayer(TOPS_MID,   BASE_Y, [80,160,100]);
   drawSnow (TOPS_MID,   snap(height*0.68), 100);
 
-  drawLayer(TOPS_FRONT, BASE_Y,            [70,175,95]);
+  // 前山：本来就与草坪相连
+  drawLayer(TOPS_FRONT, BASE_Y, [70,175,95]);
 }
 
 function drawMeadow(){
