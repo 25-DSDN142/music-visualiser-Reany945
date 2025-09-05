@@ -19,35 +19,38 @@ let steve = { x:0, y:0, w:0, h:0, dir:1, speed:1.4, bob:0 };
 
 let oaks = [];
 
-// === HUD（MC风：生命/饥饿/氧气） ===
 const VMAX = 50;
-let hud = { hp:8, hunger:8, oxy:8 }; // 0..10（支持半格）
-const HEART_MASK = [
-  "011110",
-  "111111",
-  "111111",
-  "011110",
-  "001100"
+
+const HUD_LERP = 0.28;
+let hud = { hp:8, hunger:8, oxy:8, armor:8 };
+let autoMax = { vocal:5, bass:5, other:5, drum:5 };
+
+const ICON8_HEART = [
+  "00111100","01111110","11111111","11111111",
+  "11111111","01111110","00111100","00011000"
 ];
-const MEAT_MASK = [
-  "011110",
-  "111111",
-  "111111",
-  "111111",
-  "011110"
+const ICON8_MEAT = [
+  "00011100","00111110","01111111","01111111",
+  "01111111","00111111","00011110","00001100"
 ];
-const BUBBLE_MASK = [
-  "011110",
-  "111111",
-  "111111",
-  "111111",
-  "011110"
+const ICON8_BUBBLE = [
+  "00111100","01111110","11111111","11111111",
+  "11111111","11111111","01111110","00111100"
 ];
+const ICON8_ARMOR = [
+  "01111110","11111111","11100111","11100111",
+  "11011011","11011011","11111111","01111110"
+];
+
+const PAL_HEART = { edge:[0,0,0], fill:[215,35,35], shade:[160,25,25], hi:[255,160,160], empty:[0,0,0] };
+const PAL_MEAT  = { edge:[0,0,0], fill:[200,135,70], shade:[150,95,55],  hi:[240,205,150], empty:[0,0,0], bone:[245,240,225] };
+const PAL_BUBBLE= { edge:[0,0,0], fill:[120,175,255], shade:[88,130,210], hi:[245,255,255], empty:[0,0,0] };
+const PAL_ARMOR = { edge:[0,0,0], fill:[205,205,205], shade:[150,150,160], hi:[235,235,240], empty:[0,0,0] };
 
 function snap(v){ return Math.round(v/PIX)*PIX; }
 function block(x,y,w=PIX,h=PIX){ rect(snap(x),snap(y),snap(w),snap(h)); }
-
 function bump(t,c,w){ let x=(t-c)/(w/2); if(Math.abs(x)>1) return 0; let s=Math.cos(x*Math.PI*0.5); return s*s; }
+
 function fixedRidgeHeights(cols, baseY, amp, profile){
   let tops=new Array(cols);
   for(let i=0;i<cols;i++){
@@ -65,6 +68,7 @@ function fixedRidgeHeights(cols, baseY, amp, profile){
 function initScene(){
   PIX=int(constrain(round(min(width,height)/110),6,14));
   BASE_Y=snap(height*MEADOW_TOP);
+  noSmooth();
 
   for(let i=0;i<6;i++){ clouds.push({x:random(width),y:random(height*0.10,height*0.26),s:random(50,90),vx:random(0.4,0.9)}); }
   for(let i=0;i<140;i++){ flowersSmall.push({x:random(width),y:random(BASE_Y,height*0.985)}); }
@@ -78,13 +82,10 @@ function initScene(){
 
   const GW=12, GH=18;
   steve.w = GW*PIX; steve.h = GH*PIX;
-  steve.x = width*0.15;
-  steve.y = BASE_Y - steve.h;
+  steve.x = width*0.15; steve.y = BASE_Y - steve.h;
 
   let n = int(random(5,8));
-  for(let i=0;i<n;i++){
-    oaks.push({ x: snap(random(width*0.08,width*0.92)), s: random()<0.5 ? 1 : 2 });
-  }
+  for(let i=0;i<n;i++){ oaks.push({ x: snap(random(width*0.08,width*0.92)), s: random()<0.5 ? 1 : 2 }); }
 
   inited=true;
 }
@@ -99,6 +100,7 @@ function drawCloud(cx,cy,s){
     }
   }
 }
+
 function drawSky(other){
   const rows=ceil(height/PIX);
   for(let i=0;i<rows;i++){
@@ -109,6 +111,7 @@ function drawSky(other){
   const speed=0.4+map(other,0,VMAX,0,1,true);
   for(let c of clouds){ c.x+=c.vx*speed; if(c.x>width+100) c.x=-100; drawCloud(c.x,c.y,c.s); }
 }
+
 function drawSun(vocal){
   const d=map(vocal,0,VMAX,40,90,true);
   noStroke(); fill(255,230,160);
@@ -128,6 +131,7 @@ function drawLayer(tops, baseY, col){
     for(let y=tops[i]; y<=snap(baseY); y+=PIX) block(x,y);
   }
 }
+
 function drawSnow(tops, baseY, level){
   noStroke(); fill(255);
   for(let i=0;i<tops.length;i++){
@@ -135,11 +139,13 @@ function drawSnow(tops, baseY, level){
     if(top < baseY-level){ block(i*PIX, top); block(i*PIX, top+PIX); }
   }
 }
+
 function drawMountains(){
   drawLayer(TOPS_BACK,  BASE_Y, [92,150,112]); drawSnow(TOPS_BACK,  snap(height*0.58), 120);
   drawLayer(TOPS_MID,   BASE_Y, [80,160,100]); drawSnow(TOPS_MID,   snap(height*0.68), 100);
   drawLayer(TOPS_FRONT, BASE_Y, [70,175,95]);
 }
+
 function drawMeadow(){
   for(let y=BASE_Y; y<height; y+=PIX){
     const k=map(y,BASE_Y,height,0,1);
@@ -148,27 +154,18 @@ function drawMeadow(){
   }
 }
 
-// 橡木
 function drawOakTree(xCenter, s){
   const trunkC = [124,92,62];
   const leafC  = [76,140,72];
   const leafD  = [56,110,54];
-
   const tw = 2*s, th = 5*s;
   const yTop = BASE_Y - th*PIX;
-
   fill(trunkC[0],trunkC[1],trunkC[2]);
-  for(let yy=0; yy<th; yy++){
-    for(let xx=0; xx<tw; xx++){
-      block(xCenter + (xx - tw/2)*PIX, yTop + yy*PIX);
-    }
-  }
-
+  for(let yy=0; yy<th; yy++) for(let xx=0; xx<tw; xx++) block(xCenter + (xx - tw/2)*PIX, yTop + yy*PIX);
   const rows = [4*s, 6*s, 8*s, 6*s];
   let yLeafTop = yTop - rows.length*PIX;
   for(let r=0; r<rows.length; r++){
-    let w = rows[r];
-    let x0 = xCenter - (w/2)*PIX;
+    let w = rows[r], x0 = xCenter - (w/2)*PIX;
     fill(leafC[0],leafC[1],leafC[2]);
     for(let i=0;i<w;i++) block(x0 + i*PIX, yLeafTop + r*PIX);
   }
@@ -176,9 +173,9 @@ function drawOakTree(xCenter, s){
   fill(leafD[0],leafD[1],leafD[2]);
   for(let i=0;i<wB;i+=2) block(xB + i*PIX, yLeafTop + (rows.length-1)*PIX);
 }
+
 function drawOaks(){ for(let o of oaks){ drawOakTree(o.x, o.s); } }
 
-// 花
 function drawFlowers(vocal){
   const bob=sin(frameCount*0.05)*map(vocal,0,VMAX,0,2,true);
   for(let f of flowersSmall){
@@ -195,7 +192,6 @@ function drawFlowers(vocal){
   }
 }
 
-// Steve
 function drawSteveBody(x0, y0, dir){
   const skin=[223,171,135], skinBack=[200,152,120];
   const hair=[60,40,25];
@@ -219,6 +215,7 @@ function drawSteveBody(x0, y0, dir){
   put(white,7,5,1,1); put(eye,7,5,1,1);
   put([190,140,110],5,7,3,1);
 }
+
 function updateAndDrawSteve(drum){
   let sp=steve.speed + map(drum,0,VMAX,0,1.0,true);
   steve.x += steve.dir*sp;
@@ -231,66 +228,129 @@ function updateAndDrawSteve(drum){
   drawSteveBody(steve.x,steve.y,steve.dir);
 }
 
-// === HUD 绘制 ===
-function drawIconMask(x,y,mask,fillCol,emptyCol,state){
-  // state: 0=empty, 0.5=half, 1=full
-  const rows = mask.length;
-  const cols = mask[0].length;
-  for(let r=0;r<rows;r++){
-    for(let c=0;c<cols;c++){
-      if(mask[r][c]==='1'){
-        if(state===1) fill(fillCol[0],fillCol[1],fillCol[2]);
-        else if(state===0.5 && c < cols/2) fill(fillCol[0],fillCol[1],fillCol[2]);
-        else fill(emptyCol[0],emptyCol[1],emptyCol[2]);
-        block(x + c*PIX, y + r*PIX);
+function iconIsEdge(mask,r,c){
+  const H=mask.length, W=mask[0].length;
+  if(mask[r][c]!=='1') return false;
+  const N=[[1,0],[-1,0],[0,1],[0,-1]];
+  for(let k=0;k<4;k++){
+    const rr=r+N[k][0], cc=c+N[k][1];
+    if(rr<0||rr>=H||cc<0||cc>=W||mask[rr][cc]!=='1') return true;
+  }
+  return false;
+}
+
+function drawIconSlotVanilla(x,y,mask,pal,state,kind){
+  const H=mask.length, W=mask[0].length;
+  for(let r=0;r<H;r++){
+    for(let c=0;c<W;c++){
+      if(mask[r][c]==='1' && iconIsEdge(mask,r,c)){
+        fill(pal.edge[0],pal.edge[1],pal.edge[2]);
+        block(x+c*PIX, y+r*PIX);
       }
     }
   }
+  for(let r=0;r<H;r++){
+    for(let c=0;c<W;c++){
+      if(mask[r][c]!=='1' || iconIsEdge(mask,r,c)) continue;
+      fill(pal.empty[0],pal.empty[1],pal.empty[2]);
+      block(x+c*PIX, y+r*PIX);
+    }
+  }
+  if(state<=0) return;
+
+  let limit = state>=1 ? W : Math.floor(W/2);
+  for(let r=0;r<H;r++){
+    for(let c=0;c<limit;c++){
+      if(mask[r][c]!=='1' || iconIsEdge(mask,r,c)) continue;
+      let kx=c/(W-1), ky=r/(H-1);
+      let col=pal.fill;
+      if(kind==='heart'){
+        if(kx<0.45 && ky<0.45) col=pal.hi; else if(ky>0.65||kx>0.75) col=pal.shade;
+      }else if(kind==='meat'){
+        if(kx<0.35 && ky<0.35) col=pal.hi; else if(kx>0.70||ky>0.70) col=pal.shade;
+      }else if(kind==='bubble'){
+        if(kx<0.45 && ky<0.42) col=pal.hi; else if(ky>0.62) col=pal.shade;
+      }else if(kind==='armor'){
+        if(ky<0.35) col=pal.hi; else if(ky>0.65) col=pal.shade;
+      }
+      fill(col[0],col[1],col[2]);
+      block(x+c*PIX, y+r*PIX);
+    }
+  }
+  if(kind==='meat' && state>0){
+    const bone = pal.bone;
+    const bx = x + (W-2)*PIX, by = y + 3*PIX;
+    fill(bone[0],bone[1],bone[2]); block(bx, by);
+    block(bx, by-PIX); block(bx+PIX, by);
+  }
 }
+
 function drawHUD(vocal, drum, bass, other){
-  // 平滑映射
-  let targetHP = constrain(map(vocal,0,VMAX,2,10),0,10);
-  let targetHG = constrain(map(bass ,0,VMAX,2,10),0,10);
-  let targetOX = constrain(map(other,0,VMAX,2,10),0,10);
-  hud.hp = lerp(hud.hp, targetHP, 0.18);
-  hud.hunger = lerp(hud.hunger, targetHG, 0.18);
-  hud.oxy = lerp(hud.oxy, targetOX, 0.18);
+  const S = 0.62;
+  push();
+  translate(PIX*0.6, PIX*0.6);
+  scale(S);
 
-  // 背板
+  autoMax.vocal = max(autoMax.vocal*0.995, abs(vocal));
+  autoMax.bass  = max(autoMax.bass *0.985, abs(bass));
+  autoMax.other = max(autoMax.other*0.985, abs(other));
+  autoMax.drum  = max(autoMax.drum *0.995, abs(drum));
+
+  const eps=1e-6;
+  let vNorm = constrain(abs(vocal)/max(autoMax.vocal,eps),0,1);
+  let dNorm = constrain(abs(drum )/max(autoMax.drum ,eps),0,1);
+  let bNorm = constrain(abs(bass )/max(autoMax.bass ,eps),0,1);
+  let oNorm = constrain(abs(other)/max(autoMax.other,eps),0,1);
+
+  let hpFrac = constrain(vNorm/0.85, 0, 1);
+  let arFrac = constrain(dNorm/0.85, 0, 1);
+  let hgFrac = min(constrain(pow(bNorm*0.85,1.2),0,1),0.95);
+  let oxFrac = min(constrain(pow(oNorm*0.75,1.2),0,1),0.95);
+
+  hud.hp     = lerp(hud.hp,     hpFrac*10, HUD_LERP);
+  hud.hunger = lerp(hud.hunger, hgFrac*10, HUD_LERP);
+  hud.oxy    = lerp(hud.oxy,    oxFrac*10, HUD_LERP);
+  hud.armor  = lerp(hud.armor,  arFrac*10, HUD_LERP);
+
   noStroke(); fill(0,0,0,90);
-  let panelW = min(width-PIX*2, (6*PIX+PIX)*10 + PIX);
-  rect(PIX, PIX, panelW, PIX*18, 6);
+  const W = 8*PIX, H = 8*PIX;
+  const stepX = W + PIX;
+  const rowH  = H + PIX;
+  const padX  = PIX*2;
+  rect(PIX, PIX, stepX*10 + padX, rowH*4 + PIX, 6);
 
-  // 三行图标
-  const x0 = PIX*2;
-  let y = PIX*3;
-  const stepX = 6*PIX + PIX; // 每个图标占位
+  let x0 = PIX*2, y = PIX*3;
 
-  // 行1：生命（红心）
+  for(let i=0;i<10;i++){
+    let v = hud.armor - i;
+    let s = (v>=1)?1:(v>=0.5?0.5:0);
+    drawIconSlotVanilla(x0 + i*stepX, y, ICON8_ARMOR, PAL_ARMOR, s, 'armor');
+  }
+  y += rowH;
+
   for(let i=0;i<10;i++){
     let v = hud.hp - i;
-    let st = (v>=1)?1:(v>=0.5?0.5:0);
-    drawIconMask(x0 + i*stepX, y, HEART_MASK, [210,40,40], [70,30,30], st);
+    let s = (v>=1)?1:(v>=0.5?0.5:0);
+    drawIconSlotVanilla(x0 + i*stepX, y, ICON8_HEART, PAL_HEART, s, 'heart');
   }
+  y += rowH;
 
-  // 行2：饥饿（肉排）
-  y += PIX*6 + PIX;
   for(let i=0;i<10;i++){
     let v = hud.hunger - i;
-    let st = (v>=1)?1:(v>=0.5?0.5:0);
-    drawIconMask(x0 + i*stepX, y, MEAT_MASK, [190,120,60], [70,55,40], st);
+    let s = (v>=1)?1:(v>=0.5?0.5:0);
+    drawIconSlotVanilla(x0 + i*stepX, y, ICON8_MEAT, PAL_MEAT, s, 'meat');
   }
+  y += rowH;
 
-  // 行3：氧气（气泡）
-  y += PIX*6 + PIX;
   for(let i=0;i<10;i++){
     let v = hud.oxy - i;
-    let st = (v>=1)?1:(v>=0.5?0.5:0);
-    drawIconMask(x0 + i*stepX, y, BUBBLE_MASK, [120,170,255], [50,70,100], st);
+    let s = (v>=1)?1:(v>=0.5?0.5:0);
+    drawIconSlotVanilla(x0 + i*stepX, y, ICON8_BUBBLE, PAL_BUBBLE, s, 'bubble');
   }
+
+  pop();
 }
 
-// 歌词
 function drawLyrics(words){
   const ts=min(64,width*0.06);
   textSize(ts); textAlign(CENTER,CENTER); textStyle(BOLD);
@@ -303,22 +363,16 @@ function drawLyrics(words){
   text(words,width/2,height*0.14);
 }
 
-// 主帧
 function draw_one_frame(words, vocal, drum, bass, other, counter){
   if(!inited) initScene();
-
   drawSky(other);
   drawSun(vocal);
   drawMountains();
   drawMeadow();
-
   drawOaks();
   updateAndDrawSteve(drum);
   drawFlowers(vocal);
-
-  // 顶部左侧 HUD 覆盖
   drawHUD(vocal, drum, bass, other);
-
   if(!words || words===""){ last_words_opacity*=0.95; words=last_words; }
   else{ last_words_opacity=min(255,(1+last_words_opacity)*1.06); }
   last_words=words;
