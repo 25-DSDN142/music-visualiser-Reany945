@@ -26,9 +26,10 @@ let hud = { hp:8, hunger:8, oxy:8, armor:8 };
 let autoMax = { vocal:5, bass:5, other:5, drum:5 };
 
 const ICON8_HEART = [
-  "00111100","01111110","11111111","11111111",
-  "11111111","01111110","00111100","00011000"
+  "01100110","11111111","11111111","11111111",
+  "01111110","00111100","00011000","00000000"
 ];
+
 const ICON8_MEAT = [
   "00011100","00111110","01111111","01111111",
   "01111111","00111111","00011110","00001100"
@@ -42,7 +43,7 @@ const ICON8_ARMOR = [
   "11011011","11011011","11111111","01111110"
 ];
 
-const PAL_HEART = { edge:[0,0,0], fill:[215,35,35], shade:[160,25,25], hi:[255,160,160], empty:[0,0,0] };
+const PAL_HEART = {edge:[0, 0, 0], fill:[230, 30, 30],shade:[155, 10, 10],hi:[255, 120, 120],empty: [0, 0, 0]};
 const PAL_MEAT  = { edge:[0,0,0], fill:[200,135,70], shade:[150,95,55],  hi:[240,205,150], empty:[0,0,0], bone:[245,240,225] };
 const PAL_BUBBLE= { edge:[0,0,0], fill:[120,175,255], shade:[88,130,210], hi:[245,255,255], empty:[0,0,0] };
 const PAL_ARMOR = { edge:[0,0,0], fill:[205,205,205], shade:[150,150,160], hi:[235,235,240], empty:[0,0,0] };
@@ -239,8 +240,10 @@ function iconIsEdge(mask,r,c){
   return false;
 }
 
-function drawIconSlotVanilla(x,y,mask,pal,state,kind){
+function drawIconSlotVanilla(x,y,mask,pal,state,kind,rtl){
+  rtl = !!rtl;
   const H=mask.length, W=mask[0].length;
+
   for(let r=0;r<H;r++){
     for(let c=0;c<W;c++){
       if(mask[r][c]==='1' && iconIsEdge(mask,r,c)){
@@ -260,9 +263,13 @@ function drawIconSlotVanilla(x,y,mask,pal,state,kind){
 
   let limit = state>=1 ? W : Math.floor(W/2);
   for(let r=0;r<H;r++){
-    for(let c=0;c<limit;c++){
+    for(let c=0;c<W;c++){
       if(mask[r][c]!=='1' || iconIsEdge(mask,r,c)) continue;
-      let kx=c/(W-1), ky=r/(H-1);
+      const shouldFill = rtl ? (c >= W - limit) : (c < limit);
+      if(!shouldFill) continue;
+
+      const sampleC = rtl ? (W-1 - c) : c;
+      let kx = sampleC/(W-1), ky = r/(H-1);
       let col=pal.fill;
       if(kind==='heart'){
         if(kx<0.45 && ky<0.45) col=pal.hi; else if(ky>0.65||kx>0.75) col=pal.shade;
@@ -324,7 +331,11 @@ function drawHUD(vocal, drum, bass, other){
   for(let i=0;i<10;i++){
     let v = hud.armor - i;
     let s = (v>=1)?1:(v>=0.5?0.5:0);
-    drawIconSlotVanilla(x0 + i*stepX, y, ICON8_ARMOR, PAL_ARMOR, s, 'armor');
+    push();
+    translate(x0 + i*stepX, y + H);
+    scale(1, -1);
+    drawIconSlotVanilla(0, 0, ICON8_ARMOR, PAL_ARMOR, s, 'armor');
+    pop();
   }
   y += rowH;
 
