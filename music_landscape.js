@@ -103,14 +103,20 @@ function drawCloud(cx,cy,s){
 }
 
 function drawSky(other){
-  const rows=ceil(height/PIX);
+  const rows = ceil(height/PIX);
   for(let i=0;i<rows;i++){
-    const k=i/rows;
-    noStroke(); fill(lerp(60,120,k), lerp(150,210,k), 255);
-    rect(0,i*PIX,width,PIX);
+    let r = map(i, 0, rows, 60, 120, true);
+    let g = map(i, 0, rows, 150, 210, true);
+    noStroke();
+    fill(r, g, 255);
+    rect(0, i*PIX, width, PIX);
   }
-  const speed=0.4+map(other,0,VMAX,0,1,true);
-  for(let c of clouds){ c.x+=c.vx*speed; if(c.x>width+100) c.x=-100; drawCloud(c.x,c.y,c.s); }
+  const speed = 0.4 + map(other, 0, VMAX, 0, 1, true);
+  for(let c of clouds){
+    c.x += c.vx * speed;
+    if(c.x > width + 100) c.x = -100;
+    drawCloud(c.x, c.y, c.s);
+  }
 }
 
 function drawSun(vocal){
