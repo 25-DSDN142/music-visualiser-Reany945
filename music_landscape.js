@@ -1,26 +1,18 @@
 let last_words = "";
 let last_words_opacity = 0;
-
 let inited = false;
 let PIX = 8;
-
 let clouds = [];
 let flowersSmall = [];
 let flowersBig = [];
-
 const MEADOW_TOP = 0.78;
 let BASE_Y;
-
 let TOPS_BACK = [];
 let TOPS_MID = [];
 let TOPS_FRONT = [];
-
 let steve = { x:0, y:0, w:0, h:0, dir:1, speed:1.4, bob:0 };
-
 let oaks = [];
-
 const VMAX = 50;
-
 const HUD_LERP = 0.28;
 let hud = { hp:8, hunger:8, oxy:8, armor:8 };
 let autoMax = { vocal:5, bass:5, other:5, drum:5 };
@@ -103,32 +95,42 @@ function drawCloud(cx,cy,s){
 }
 
 function drawSky(other){
-  const rows = ceil(height/PIX);
+  const rows=ceil(height/PIX);
   for(let i=0;i<rows;i++){
-    let r = map(i, 0, rows, 60, 120, true);
-    let g = map(i, 0, rows, 150, 210, true);
-    noStroke();
-    fill(r, g, 255);
-    rect(0, i*PIX, width, PIX);
+    const k=i/rows;
+    noStroke(); fill(lerp(60,120,k), lerp(150,210,k), 255);
+    rect(0,i*PIX,width,PIX);
   }
-  const speed = 0.4 + map(other, 0, VMAX, 0, 1, true);
-  for(let c of clouds){
-    c.x += c.vx * speed;
-    if(c.x > width + 100) c.x = -100;
-    drawCloud(c.x, c.y, c.s);
-  }
+  const speed=0.4+map(other,0,VMAX,0,1,true);
+  for(let c of clouds){ c.x+=c.vx*speed; if(c.x>width+100) c.x=-100; drawCloud(c.x,c.y,c.s); }
 }
 
 function drawSun(vocal){
-  const d=map(vocal,0,VMAX,40,90,true);
-  noStroke(); fill(255,230,160);
-  const r=d*0.5, cx=width*0.82, cy=height*0.16;
-  for(let y=snap(cy-r); y<=snap(cy+r); y+=PIX){
-    for(let x=snap(cx-r); x<=snap(cx+r); x+=PIX){
-      const dx=(x-cx), dy=(y-cy);
-      if(dx*dx+dy*dy<=r*r) block(x,y);
+  let cells = int(map(vocal, 0, VMAX, 6, 12, true)); 
+  let size  = cells * PIX;
+  let cx = snap(width * 0.82);
+  let cy = snap(height * 0.16);
+  let left = cx - floor(size / 2);
+  let top  = cy - floor(size / 2);
+  noStroke();
+  for (let i = 0; i < cells; i++) {
+    for (let j = 0; j < cells; j++) {
+      let dx = abs(j - (cells - 1) / 2) / ((cells - 1) / 2);
+      let dy = abs(i - (cells - 1) / 2) / ((cells - 1) / 2);
+      let k  = max(dx, dy);  
+      if (k < 0.33)      fill(255, 240, 140); 
+      else if (k < 0.66) fill(255, 220,  90); 
+      else               fill(245, 190,  60); 
+
+      block(left + j * PIX, top + i * PIX);
     }
   }
+
+
+  stroke(240, 170, 50);
+  noFill();
+  rect(left, top, size, size);
+  noStroke();
 }
 
 function drawLayer(tops, baseY, col){
@@ -368,18 +370,7 @@ function drawHUD(vocal, drum, bass, other){
   pop();
 }
 
-function drawLyrics(words){
-  const ts=min(64,width*0.06);
-  textSize(ts); textAlign(CENTER,CENTER); textStyle(BOLD);
-  if(words && words.trim().length>0){
-    const tw=textWidth(words);
-    noStroke(); fill(255,255,255,90);
-    rectMode(CENTER); rect(width/2,height*0.14,tw+24,ts+24,6); rectMode(CORNER);
-  }
-  noStroke(); fill(0,0,0,int(last_words_opacity));
-  text(words,width/2,height*0.14);
-}
-
+function drawLyrics(words){}
 function draw_one_frame(words, vocal, drum, bass, other, counter){
   if(!inited) initScene();
   drawSky(other);
@@ -390,8 +381,4 @@ function draw_one_frame(words, vocal, drum, bass, other, counter){
   updateAndDrawSteve(drum);
   drawFlowers(vocal);
   drawHUD(vocal, drum, bass, other);
-  if(!words || words===""){ last_words_opacity*=0.95; words=last_words; }
-  else{ last_words_opacity=min(255,(1+last_words_opacity)*1.06); }
-  last_words=words;
-  drawLyrics(words);
 }
