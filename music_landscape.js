@@ -16,7 +16,7 @@ const VMAX = 50;
 const HUD_LERP = 0.28;
 let hud = { hp:8, hunger:8, oxy:8, armor:8 };
 let autoMax = { vocal:5, bass:5, other:5, drum:5 };
-
+let foothills = [];
 const ICON8_HEART = [
   "01100110","11111111","11111111","11111111",
   "01111110","00111100","00011000","00000000"
@@ -79,10 +79,55 @@ function initScene(){
 
   let n = int(random(5,8));
   for(let i=0;i<n;i++){ oaks.push({ x: snap(random(width*0.08,width*0.92)), s: random()<0.5 ? 1 : 2 }); }
+  
 
   inited=true;
 }
+function mix(a, b, t){ return a + (b - a) * t; }
 
+function ridgeMin(tops){
+  let m = 1e9;
+  for (let i = 0; i < tops.length; i++) if (tops[i] < m) m = tops[i];
+  return m;
+}
+
+function makeFoothillRow(y, count, halfW, height, colTop, colBase){
+  let step = width / (count - 1);
+  for(let i=0;i<count;i++){
+    let jitter = (i % 2 ? PIX*3 : 0);                 // 轻微错位让形状更自然
+    foothills.push({
+      x: snap(i*step + jitter),
+      y: snap(y),
+      halfW: halfW,
+      h: height,
+      colTop: colTop,     
+      colBase: colBase   
+    });
+  }
+}
+
+function drawOneHill(h){
+ 
+  for(let yy = h.y - h.h; yy <= h.y; yy += PIX){
+    let t = map(yy, h.y - h.h, h.y, 0, 1, true);
+    let half = floor(h.halfW * (1 - t));              // 越往上越窄
+    let r = mix(h.colTop[0],  h.colBase[0], t);
+    let g = mix(h.colTop[1],  h.colBase[1], t);
+    let b = mix(h.colTop[2],  h.colBase[2], t);
+    fill(r, g, b);
+    for(let xx = h.x - half; xx <= h.x + half; xx += PIX) block(xx, yy);
+  }
+  // 顶缘轻描边，强调体块
+  stroke(30, 60); strokeWeight(2);
+  line(h.x - h.halfW, h.y - h.h, h.x + h.halfW, h.y - h.h);
+  noStroke();
+}
+
+function drawFoothills(){
+  // 先按 y 从小到大排序：越靠上 = 越远，先画远处再画近处
+  foothills.sort((a,b)=>a.y - b.y);
+  for(const h of foothills) drawOneHill(h);
+}
 function drawCloud(cx,cy,s){
   noStroke(); fill(255);
   const r=s*0.5;
@@ -133,26 +178,31 @@ function drawSun(vocal){
   noStroke();
 }
 
-function drawLayer(tops, baseY, col){
-  noStroke(); fill(col[0],col[1],col[2]);
-  for(let i=0;i<tops.length;i++){
-    let x=i*PIX;
-    for(let y=tops[i]; y<=snap(baseY); y+=PIX) block(x,y);
+function drawLayer(tops, baseY, colTop, colBase, withSnow){
+  noStroke();
+  for (let i = 0; i < tops.length; i++){
+    let x = i * PIX;
+    let topY = tops[i];
+
+    // 纵向渐变（顶端偏蓝/亮、向下偏绿/暗）
+    for (let y = topY; y <= snap(baseY); y += PIX){
+      let t = map(y, topY, baseY, 0, 1, true);
+      let r = mix(colTop[0],  colBase[0],  t);
+      let g = mix(colTop[1],  colBase[1],  t);
+      let b = mix(colTop[2],  colBase[2],  t);
+      fill(r, g, b);
+      block(x, y);
+    }
   }
 }
 
-function drawSnow(tops, baseY, level){
-  noStroke(); fill(255);
-  for(let i=0;i<tops.length;i++){
-    let top=tops[i];
-    if(top < baseY-level){ block(i*PIX, top); block(i*PIX, top+PIX); }
-  }
-}
+
 
 function drawMountains(){
-  drawLayer(TOPS_BACK,  BASE_Y, [92,150,112]); drawSnow(TOPS_BACK,  snap(height*0.58), 120);
-  drawLayer(TOPS_MID,   BASE_Y, [80,160,100]); drawSnow(TOPS_MID,   snap(height*0.68), 100);
-  drawLayer(TOPS_FRONT, BASE_Y, [70,175,95]);
+  drawSnowMountain();           // 放在最前，作为最远背景
+  drawLayer(TOPS_BACK,  BASE_Y, [102,200,112], [100,150,120], true);
+  drawLayer(TOPS_MID,   BASE_Y, [80,160,100], [85,160,105],  true);
+  drawLayer(TOPS_FRONT, BASE_Y, [60,140,90],  [75,175,95],   false);
 }
 
 function drawMeadow(){
@@ -162,7 +212,42 @@ function drawMeadow(){
     rect(0,y,width,PIX);
   }
 }
+function drawSnowMountain(){
 
+  let cx    = snap(width * 0.62);
+  let topY  = snap(height * 0.3);  
+  let baseY = snap(height * 0.60);  
+  let halfW0 = snap(width * 2);  
+  let stepH  = PIX * 1;             
+
+  for (let y = baseY; y >= topY; y -= stepH) {
+    let t = map(y, baseY, topY, 0, 1, true);
+    // 更尖的山顶
+    let half = floor(halfW0 * (1 - t * 0.95));
+    let left = snap(cx - half);
+    let right= snap(cx + half);
+
+    for (let yy = y - stepH + PIX; yy <= y; yy += PIX) {
+      for (let x = left; x <= right; x += PIX) {
+        let tt = map(yy, topY, baseY, 0, 1, true);
+
+        // 雪面 + 斑驳
+        let snow = (tt < 0.38) || (tt < 0.55 && ((x/PIX + yy/PIX) % 5 < 2));
+        if (snow) {
+          let s = (x > cx) ? -10 : 10;
+          fill(245 + s, 245 + s, 255);
+        } else {
+          let k = map(tt, 0.38, 1, 0, 1, true);
+          let r = lerp(200,140,k), g = lerp(205,160,k), b = lerp(215,175,k);
+          if (((x/PIX + yy/PIX) % 9) === 0) { r -= 25; g -= 25; b -= 25; }
+          if (x > cx) { r -= 10; g -= 10; b -= 10; }
+          fill(r, g, b);
+        }
+        block(x, yy);
+      }
+    }
+  }
+}
 function drawOakTree(xCenter, s){
   const trunkC = [124,92,62];
   const leafC  = [76,140,72];
