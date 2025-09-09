@@ -100,8 +100,8 @@ function makeFoothillRow(y, count, halfW, height, colTop, colBase){
       y: snap(y),
       halfW: halfW,
       h: height,
-      colTop: colTop,     
-      colBase: colBase   
+      colTop: colTop,     // 顶部颜色（偏亮/偏蓝）
+      colBase: colBase    // 底部颜色（偏绿/偏暗）
     });
   }
 }
@@ -216,7 +216,7 @@ function drawSnowMountain(){
 
   let cx    = snap(width * 0.62);
   let topY  = snap(height * 0.3);  
-  let baseY = snap(height * 0.60);  
+  let baseY = snap(height * 0.6);  
   let halfW0 = snap(width * 2);  
   let stepH  = PIX * 1;             
 
