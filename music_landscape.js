@@ -311,7 +311,7 @@ function drawSteveBody(x0, y0, dir){
 }
 
 function updateAndDrawSteve(drum){
-  let sp=steve.speed + map(drum,0,VMAX,0,1.0,true);
+ let sp = (steve.speed + map(drum, 0, VMAX, 0, 1.0, true)) * 5; 
   steve.x += steve.dir*sp;
   let L=PIX*2, R=width-steve.w-PIX*2;
   if(steve.x>R){steve.x=R;steve.dir=-1;}
