@@ -1,8 +1,6 @@
-const canvasWidth = 540;
-const canvasHeight = 960;
+// ===== Fullscreen version =====
 
-
-let mainCanvas;
+let main_canvas;
 
 let textInput;
 let slider1, slider2, slider3, slider4;
@@ -27,10 +25,8 @@ function songLoaded() {
   songLoadStatus = "loaded";
   songButton.elt.innerHTML = "run song";
   songButton.elt.disabled = false;
-  // let now = millis();
-  // songEpoch = now + 5000;
-  if(debugFastRefresh && getAudioContext().state != "suspended"){
-    switchRunMode()
+  if (debugFastRefresh && getAudioContext().state != "suspended") {
+    switchRunMode();
   }
 }
 
@@ -49,10 +45,12 @@ let volumes = [];
 let volume_length = 0;
 
 function setup() {
-  main_canvas = createCanvas(canvasWidth, canvasHeight);
+  // fullscreen canvas
+  main_canvas = createCanvas(windowWidth, windowHeight);
   main_canvas.parent('canvasContainer');
-  song = loadSound('song.mp3', songLoaded, songLoadedError, songLoadedSoFar);  
-  
+
+  song = loadSound('song.mp3', songLoaded, songLoadedError, songLoadedSoFar);
+
   frameRate(60);
   angleMode(DEGREES);
 
@@ -82,36 +80,36 @@ function setup() {
   vol4 = [];
   volumes = [vol1, vol2, vol3, vol4];
   volume_table_length = table.getRowCount();
-  for(let i=0; i< volume_table_length;i++) {
+  for (let i = 0; i < volume_table_length; i++) {
     let roww = table["rows"][i].arr;
     vol1.push(float(roww[1]));
     vol2.push(float(roww[2]));
     vol3.push(float(roww[3]));
     vol4.push(float(roww[4]));
   }
-  /*
-  for(let i=0; i<4; i++) {
-    let radius = map(i, 0, 3, 0, 3);
-    volumes[i] = Taira.smoothen(vol1, Taira.ALGORITHMS.GAUSSIAN, 10, radius, true)
-  }
-  volumes[0] = vol1;
-  */
-  if(smoothing != 0) {
+
+  if (smoothing != 0) {
     let radius = map(smoothing, 0, 100, 0, 3);
-    for(let i=0; i<4; i++) {
-      volumes[i] = Taira.smoothen(volumes[i], Taira.ALGORITHMS.GAUSSIAN, 10, radius, true)
+    for (let i = 0; i < 4; i++) {
+      volumes[i] = Taira.smoothen(volumes[i], Taira.ALGORITHMS.GAUSSIAN, 10, radius, true);
     }
   }
 }
 
+// resize with window (rebuild scene next frame)
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  if (typeof inited !== 'undefined') inited = false; // 让你的场景在下帧重建
+  if (typeof reset_music === 'function') reset_music();
+}
+
 function switchRunMode() {
-  if(editorMode) {
-    if(songLoadStatus == "loading") {
+  if (editorMode) {
+    if (songLoadStatus == "loading") {
       alert("Song still loading...");
       return;
-    }
-    else if (songLoadStatus == "error") {
-      alert("Cannot switch mode, there was a problem loading the audio")
+    } else if (songLoadStatus == "error") {
+      alert("Cannot switch mode, there was a problem loading the audio");
       return;
     }
     textInput.elt.disabled = true;
@@ -124,9 +122,8 @@ function switchRunMode() {
     let now = millis();
     songEpoch = now + (debugFastRefresh ? 0 : 5000);
     songButton.elt.innerHTML = "stop music";
-  }
-  else {
-    if(songIsPlaying) {
+  } else {
+    if (songIsPlaying) {
       song.stop();
       songIsPlaying = false;
     }
@@ -150,31 +147,27 @@ function draw() {
     let s4 = slider4.value();
 
     draw_one_frame(w, s1, s2, s3, s4, 0);
-  }
-  else {
-    if(songEpoch > 0) {
+  } else {
+    if (songEpoch > 0) {
       let now = millis();
       let songOffset = now - songEpoch;
-      if(songOffset < 0) {
+      if (songOffset < 0) {
         background(0);
         let secondsRemaining = songOffset / -1000.0;
         let intSecs = int(secondsRemaining);
-        if(intSecs > 0) {
+        if (intSecs > 0) {
           let remainder = secondsRemaining - intSecs;
           let curAngle = map(remainder, 0, 1, 630, 270);
-          // print(secondsRemaining, intSecs, remainder, curAngle);
           noStroke();
           fill(200);
-          arc(width/2, height/2, 400, 400, curAngle, curAngle+10);
+          arc(width / 2, height / 2, 400, 400, curAngle, curAngle + 10);
           stroke(255);
           fill(255);
           textSize(200);
           textAlign(CENTER, CENTER);
-          text(intSecs, width/2, height/2);
+          text(intSecs, width / 2, height / 2);
         }
-        // text("Song starting in: " + secondsRemaining, width/2, height/2)      
-      }
-      else if (!songIsPlaying) {
+      } else if (!songIsPlaying) {
         song.play();
         songIsPlaying = true;
         songEpoch = millis();
@@ -183,61 +176,34 @@ function draw() {
         }
       }
     }
-    if(songIsPlaying) {
+    if (songIsPlaying) {
       let curMillis = millis();
       let timeOffset = curMillis - songEpoch;
       let curSlice = int(60 * timeOffset / 1000.0);
       if (curSlice < volume_table_length) {
-        // print("Processing " + curSlice + " of " + table.getRowCount())
-        // let row = table["rows"][curSlice].arr
-        // draw_one_frame(row);
-        // print(row);
-        let roww = [volumes[0][curSlice], volumes[1][curSlice], volumes[2][curSlice], volumes[3][curSlice]]
+        let roww = [volumes[0][curSlice], volumes[1][curSlice], volumes[2][curSlice], volumes[3][curSlice]];
         cur_words = "";
-        if (curSlice < words.length) {
-          cur_words = words[curSlice];
-        }
+        if (curSlice < words.length) cur_words = words[curSlice];
         textInput.value(cur_words);
         slider1.value(roww[0]);
         slider2.value(roww[1]);
         slider3.value(roww[2]);
         slider4.value(roww[3]);
-       draw_one_frame(cur_words, roww[0], roww[1], roww[2], roww[3], curSlice);//currentTime()
-       //draw_one_frame(cur_words, roww[0], roww[1], roww[2], roww[3], song.currentTime());
+        draw_one_frame(cur_words, roww[0], roww[1], roww[2], roww[3], curSlice);
       }
     }
   }
 }
 
 function keyTyped() {
-  if (key == '1') {
-    song.setVolume(0.1);
-  }
-  if (key == '2') {
-    song.setVolume(0.2);
-  }
-  if (key == '3') {
-    song.setVolume(0.3);
-  }
-  if (key == '4') {
-    song.setVolume(0.4);
-  }
-  if (key == '5') {
-    song.setVolume(0.5);
-  }
-  if (key == '6') {
-    song.setVolume(0.6);
-  }
-  if (key == '7') {
-    song.setVolume(0.7);
-  }
-  if (key == '8') {
-    song.setVolume(0.8);
-  }
-  if (key == '9') {
-    song.setVolume(0.9);
-  }
-  if (key == '0') {
-    song.setVolume(1.0);
-  }
+  if (key == '1') song.setVolume(0.1);
+  if (key == '2') song.setVolume(0.2);
+  if (key == '3') song.setVolume(0.3);
+  if (key == '4') song.setVolume(0.4);
+  if (key == '5') song.setVolume(0.5);
+  if (key == '6') song.setVolume(0.6);
+  if (key == '7') song.setVolume(0.7);
+  if (key == '8') song.setVolume(0.8);
+  if (key == '9') song.setVolume(0.9);
+  if (key == '0') song.setVolume(1.0);
 }
